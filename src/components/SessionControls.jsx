@@ -1,7 +1,11 @@
 import React from "react";
-import { Newspaper, Sparkles } from "lucide-react";
+import { Newspaper, Sparkles, Wifi, WifiOff } from "lucide-react";
 
-const SessionControls = ({ messageCount = 0 }) => {
+const SessionControls = ({
+  messageCount = 0,
+  isConnected = false,
+  currentSessionTitle,
+}) => {
   return (
     <div className="header-content">
       <div className="flex items-center gap-3">

@@ -3,7 +3,13 @@ import { Send, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import NewsSourceCard from "./NewsSourceCard";
 
-const ChatInterface = ({ messages, isLoading, onSendMessage }) => {
+const ChatInterface = ({
+  messages,
+  isLoading,
+  isStreaming,
+  onSendMessage,
+  sidebarOpen,
+}) => {
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -125,7 +131,7 @@ const ChatInterface = ({ messages, isLoading, onSendMessage }) => {
             ))}
 
             {/* Loading indicator */}
-            {isLoading && (
+            {(isLoading || isStreaming) && (
               <div className="message-row assistant">
                 <div className="avatar avatar-assistant">AI</div>
                 <div className="flex-1">
@@ -136,7 +142,9 @@ const ChatInterface = ({ messages, isLoading, onSendMessage }) => {
                       <div className="typing-dot"></div>
                     </div>
                     <span className="text-gray-400">
-                      Searching news articles...
+                      {isStreaming
+                        ? "Streaming response..."
+                        : "Searching news articles..."}
                     </span>
                   </div>
                 </div>

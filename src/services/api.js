@@ -15,7 +15,7 @@ export const chatAPI = {
   // Send a message to the chat endpoint
   sendMessage: async (message, sessionId = null) => {
     try {
-      const response = await api.post("/chat", {
+      const response = await api.post("/api/chat", {
         message,
         session_id: sessionId,
       });
@@ -29,7 +29,7 @@ export const chatAPI = {
   // Reset chat session
   resetSession: async () => {
     try {
-      const response = await api.post("/reset");
+      const response = await api.post("/api/chat/reset");
       return response.data;
     } catch (error) {
       console.error("Error resetting session:", error);
@@ -40,7 +40,7 @@ export const chatAPI = {
   // Get chat history (if backend supports it)
   getChatHistory: async (sessionId) => {
     try {
-      const response = await api.get(`/history/${sessionId}`);
+      const response = await api.get(`/api/chat/history/${sessionId}`);
       return response.data;
     } catch (error) {
       console.error("Error getting chat history:", error);
