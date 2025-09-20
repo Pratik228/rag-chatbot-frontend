@@ -1,5 +1,5 @@
 import React from "react";
-import { ExternalLink, Calendar } from "lucide-react";
+import { ExternalLink, Calendar, Globe } from "lucide-react";
 
 const NewsSourceCard = ({ source }) => {
   if (!source) return null;
@@ -10,42 +10,72 @@ const NewsSourceCard = ({ source }) => {
     }
   };
 
+  // Format score if available
+  const formatScore = (score) => {
+    if (typeof score === "number") {
+      return `${Math.round(score * 100)}%`;
+    }
+    return null;
+  };
+
   return (
-    <div
-      className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-      onClick={handleClick}
-    >
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <h4 className="font-semibold text-gray-900 text-sm mb-1 line-clamp-2">
+    <div className="source-card" onClick={handleClick}>
+      <div className="flex items-start gap-3">
+        {/* Source Icon */}
+        <div className="flex-shrink-0 w-6 h-6 bg-gray-600 rounded flex items-center justify-center">
+          <Globe className="w-3 h-3 text-gray-300" />
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <h4 className="font-medium text-sm mb-1 line-clamp-2">
             {source.title || "News Article"}
           </h4>
 
           {source.description && (
-            <p className="text-gray-600 text-xs mb-2 line-clamp-2">
+            <p className="text-xs mb-2 line-clamp-2 leading-relaxed">
               {source.description}
             </p>
           )}
 
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            {source.published_at && (
-              <div className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                <span>
-                  {new Date(source.published_at).toLocaleDateString()}
-                </span>
-              </div>
-            )}
+          <div className="source-meta flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {/* Publication Date */}
+              {(source.published_at || source.publishedAt) && (
+                <div className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  <span>
+                    {new Date(
+                      source.published_at || source.publishedAt
+                    ).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </span>
+                </div>
+              )}
 
-            {source.source && (
-              <span className="bg-gray-100 px-2 py-1 rounded text-xs">
-                {source.source}
-              </span>
+              {/* Source Name */}
+              {source.source && (
+                <span className="text-xs bg-gray-700 px-2 py-1 rounded text-gray-300">
+                  {source.source}
+                </span>
+              )}
+            </div>
+
+            {/* Relevance Score */}
+            {source.score && (
+              <div className="text-xs text-green-400 bg-green-900/20 px-2 py-1 rounded">
+                {formatScore(source.score)}
+              </div>
             )}
           </div>
         </div>
 
-        <ExternalLink className="w-4 h-4 text-gray-400 ml-2 flex-shrink-0" />
+        {/* External Link Icon */}
+        <div className="flex-shrink-0 text-gray-500">
+          <ExternalLink className="w-4 h-4" />
+        </div>
       </div>
     </div>
   );

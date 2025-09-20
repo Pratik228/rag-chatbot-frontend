@@ -8,28 +8,28 @@ function App() {
     useNewsChat();
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100">
-      {/* Header with session controls */}
-      <SessionControls
-        onReset={resetSession}
-        isLoading={isLoading}
-        messageCount={messages.length}
-      />
+    <div className="chat-container min-h-screen flex flex-col">
+      {/* Header */}
+      <div className="chat-header">
+        <SessionControls messageCount={messages.length} />
+      </div>
 
-      {/* Error banner */}
+      {/* Error Banner */}
       {error && (
-        <div className="bg-red-100 border border-red-200 text-red-700 px-4 py-2 flex items-center justify-between">
-          <span className="text-sm">{error}</span>
-          <button
-            onClick={clearError}
-            className="text-red-500 hover:text-red-700 text-sm underline"
-          >
-            Dismiss
-          </button>
+        <div className="error-banner">
+          <div className="max-w-4xl mx-auto flex items-center justify-between">
+            <span>{error}</span>
+            <button
+              onClick={clearError}
+              className="text-red-300 hover:text-red-100 underline"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Main chat interface */}
+      {/* Main Chat Interface */}
       <div className="flex-1 overflow-hidden">
         <ChatInterface
           messages={messages}
@@ -39,9 +39,9 @@ function App() {
       </div>
 
       {/* Footer */}
-      <div className="bg-white border-t border-gray-200 px-4 py-2">
-        <p className="text-xs text-gray-500 text-center">
-          RAG News Chatbot - Ask me about recent news and current events
+      <div className="chat-footer">
+        <p className="footer-text">
+          RAG News Chatbot • Powered by AI and real-time news data
         </p>
       </div>
     </div>
