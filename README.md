@@ -214,5 +214,3 @@ Key development features:
 4. **Update Title** → Inline editing with optimistic updates
 5. **Delete Session** → Clean removal with state updates
 6. **Switch Sessions** → URL routing and state management
-
-Enjoy building with your RAG News Chatbot! 🚀
