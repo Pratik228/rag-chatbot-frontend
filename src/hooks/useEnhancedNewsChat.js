@@ -7,6 +7,7 @@ export const useEnhancedNewsChat = () => {
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const [error, setError] = useState(null);
   const [streamingContent, setStreamingContent] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -23,18 +24,64 @@ export const useEnhancedNewsChat = () => {
   // Load sessions on mount
   useEffect(() => {
     const initializeApp = async () => {
-      await loadSessions();
+      try {
+        setIsLoadingSessions(true);
 
-      // Try to restore last session from localStorage
-      const savedSessionId = localStorage.getItem("currentSessionId");
-      if (savedSessionId) {
-        setCurrentSessionId(savedSessionId);
-        await loadSessionMessages(savedSessionId);
+        // Load sessions and restore session in parallel for better performance
+        const [sessionsData] = await Promise.allSettled([
+          loadSessions(),
+          // Restore last session from localStorage
+          (async () => {
+            const savedSessionId = localStorage.getItem("currentSessionId");
+            if (savedSessionId) {
+              setCurrentSessionId(savedSessionId);
+              // Don't load messages immediately - let the URL routing handle it
+            }
+          })(),
+        ]);
+      } catch (err) {
+        console.error("Error initializing app:", err);
+        setError("Failed to initialize application");
+      } finally {
+        setIsLoadingSessions(false);
       }
     };
 
     initializeApp();
   }, []);
+
+  // Listen for Socket.IO session updates
+  useEffect(() => {
+    if (socket) {
+      const handleSessionUpdate = (data) => {
+        if (data.session) {
+          setSessions((prev) =>
+            prev.map((s) =>
+              s.id === data.session.id ? { ...s, ...data.session } : s
+            )
+          );
+        }
+      };
+
+      const handleSessionTitleUpdate = (data) => {
+        if (data.sessionId && data.title) {
+          setSessions((prev) =>
+            prev.map((s) =>
+              s.id === data.sessionId ? { ...s, title: data.title } : s
+            )
+          );
+        }
+      };
+
+      socket.on("session-updated", handleSessionUpdate);
+      socket.on("session-title-updated", handleSessionTitleUpdate);
+
+      return () => {
+        socket.off("session-updated", handleSessionUpdate);
+        socket.off("session-title-updated", handleSessionTitleUpdate);
+      };
+    }
+  }, [socket]);
 
   // Join/leave session rooms when current session changes
   useEffect(() => {
@@ -68,9 +115,9 @@ export const useEnhancedNewsChat = () => {
       }
 
       const data = await response.json();
-      setSessions(data.sessions || []);
+      const newSessions = data.sessions || [];
+      setSessions(newSessions);
     } catch (err) {
-      console.error("Error loading sessions:", err);
       // Set empty sessions array if backend is not available
       setSessions([]);
     }
@@ -79,7 +126,6 @@ export const useEnhancedNewsChat = () => {
   // Load messages for a specific session
   const loadSessionMessages = useCallback(async (sessionId) => {
     try {
-      console.log("Loading messages for session:", sessionId);
       const response = await fetch(
         `${
           import.meta.env.VITE_API_BASE_URL
@@ -93,7 +139,6 @@ export const useEnhancedNewsChat = () => {
       }
 
       const data = await response.json();
-      console.log("History data received:", data);
 
       // Check multiple possible data structures from backend
       let messages = [];
@@ -120,7 +165,6 @@ export const useEnhancedNewsChat = () => {
       }
 
       if (messages.length > 0) {
-        console.log("Found messages:", messages.length);
         const formattedMessages = messages.map((msg) => ({
           id: msg.id || Date.now() + Math.random(),
           role: msg.type || msg.role, // Backend uses 'type', frontend expects 'role'
@@ -132,11 +176,9 @@ export const useEnhancedNewsChat = () => {
         setMessages(formattedMessages);
       } else {
         // Session exists but no messages yet
-        console.log("No messages found for session");
 
         // If session has messageCount > 0, try to get messages from history endpoint
         if (data.session && data.session.messageCount > 0) {
-          console.log("Session has messages, trying history endpoint...");
           try {
             const historyResponse = await fetch(
               `${
@@ -145,7 +187,6 @@ export const useEnhancedNewsChat = () => {
             );
             if (historyResponse.ok) {
               const historyData = await historyResponse.json();
-              console.log("History data:", historyData);
 
               let historyMessages = [];
               if (Array.isArray(historyData)) {
@@ -158,10 +199,6 @@ export const useEnhancedNewsChat = () => {
               }
 
               if (historyMessages.length > 0) {
-                console.log(
-                  "Found messages in history:",
-                  historyMessages.length
-                );
                 const formattedMessages = historyMessages.map((msg) => ({
                   id: msg.id || Date.now() + Math.random(),
                   role: msg.type || msg.role, // Backend uses 'type', frontend expects 'role'
@@ -242,6 +279,11 @@ export const useEnhancedNewsChat = () => {
           setMessages([]);
           setError(null);
 
+          // Refresh sessions after a delay to get any auto-generated title
+          setTimeout(() => {
+            loadSessions();
+          }, 500);
+
           return newSession;
         }
       } catch (err) {
@@ -257,8 +299,6 @@ export const useEnhancedNewsChat = () => {
   const selectSession = useCallback(
     async (sessionId) => {
       if (sessionId === currentSessionId) return;
-
-      console.log("Selecting session:", sessionId);
       setCurrentSessionId(sessionId);
       setMessages([]);
       setError(null);
@@ -277,19 +317,18 @@ export const useEnhancedNewsChat = () => {
   const deleteSession = useCallback(
     async (sessionId) => {
       try {
-        console.log("Deleting session:", sessionId);
-
         if (isConnected && socket) {
           // Use Socket.IO for real-time deletion
           return new Promise((resolve, reject) => {
             const handleSessionDeleted = (data) => {
               if (data.sessionId === sessionId) {
-                console.log("Session deleted via Socket.IO");
                 setSessions((prev) => prev.filter((s) => s.id !== sessionId));
 
-                // If deleting current session, create a new one
+                // If deleting current session, clear current session and navigate to home
                 if (sessionId === currentSessionId) {
-                  createNewSession().catch(console.error);
+                  setCurrentSessionId(null);
+                  setMessages([]);
+                  localStorage.removeItem("currentSessionId");
                 }
 
                 socket.off("session-deleted", handleSessionDeleted);
@@ -325,12 +364,13 @@ export const useEnhancedNewsChat = () => {
             throw new Error(`HTTP error! status: ${response.status}`);
           }
 
-          console.log("Session deleted via HTTP API");
           setSessions((prev) => prev.filter((s) => s.id !== sessionId));
 
-          // If deleting current session, create a new one
+          // If deleting current session, clear current session and navigate to home
           if (sessionId === currentSessionId) {
-            await createNewSession();
+            setCurrentSessionId(null);
+            setMessages([]);
+            localStorage.removeItem("currentSessionId");
           }
         }
       } catch (err) {
@@ -345,11 +385,7 @@ export const useEnhancedNewsChat = () => {
   const updateSessionTitle = useCallback(
     async (sessionId, newTitle) => {
       try {
-        console.log("updateSessionTitle called with:", sessionId, newTitle);
-        console.log("isConnected:", isConnected, "socket:", !!socket);
-
         if (isConnected && socket) {
-          console.log("Using Socket.IO for title update");
           // Use Socket.IO for real-time title update
           return new Promise((resolve, reject) => {
             let resolved = false;
@@ -357,9 +393,6 @@ export const useEnhancedNewsChat = () => {
             // Set a timeout to prevent getting stuck
             const timeout = setTimeout(() => {
               if (!resolved) {
-                console.log(
-                  "Socket.IO timeout, falling back to optimistic update"
-                );
                 setSessions((prev) =>
                   prev.map((s) =>
                     s.id === sessionId ? { ...s, title: newTitle } : s
@@ -378,10 +411,9 @@ export const useEnhancedNewsChat = () => {
             };
 
             const handleTitleUpdated = (data) => {
-              console.log("Socket.IO title updated response:", data);
               if (!resolved && data.sessionId === sessionId) {
                 resolved = true;
-                console.log("Session title updated via Socket.IO");
+
                 setSessions((prev) =>
                   prev.map((s) =>
                     s.id === sessionId ? { ...s, title: newTitle } : s
@@ -393,10 +425,9 @@ export const useEnhancedNewsChat = () => {
             };
 
             const handleSessionUpdated = (data) => {
-              console.log("Socket.IO session updated response:", data);
               if (!resolved && data.session && data.session.id === sessionId) {
                 resolved = true;
-                console.log("Session updated via Socket.IO");
+
                 setSessions((prev) =>
                   prev.map((s) =>
                     s.id === sessionId
@@ -424,27 +455,19 @@ export const useEnhancedNewsChat = () => {
             socket.on("session-updated", handleSessionUpdated);
             socket.on("session-error", handleTitleError);
 
-            console.log("Emitting update-session-title with:", {
-              sessionId,
-              title: newTitle,
-            });
             socket.emit("update-session-title", { sessionId, title: newTitle });
           });
         } else {
-          console.log("Using HTTP API for title update");
           // Fallback to HTTP API
           const url = `${
             import.meta.env.VITE_API_BASE_URL
           }/api/chat/sessions/${sessionId}`;
-          console.log("Making PUT request to:", url);
 
           const response = await fetch(url, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ title: newTitle }),
           });
-
-          console.log("HTTP response status:", response.status);
 
           if (!response.ok) {
             const errorText = await response.text();
@@ -455,9 +478,7 @@ export const useEnhancedNewsChat = () => {
           }
 
           const responseData = await response.json();
-          console.log("HTTP response data:", responseData);
 
-          console.log("Session title updated via HTTP API");
           setSessions((prev) =>
             prev.map((s) =>
               s.id === sessionId ? { ...s, title: newTitle } : s
@@ -551,7 +572,7 @@ export const useEnhancedNewsChat = () => {
                 )
               );
 
-              // Update session in the list
+              // Update session in the list with any auto-generated title
               setSessions((prev) =>
                 prev.map((s) =>
                   s.id === currentSessionId
@@ -567,6 +588,11 @@ export const useEnhancedNewsChat = () => {
                     : s
                 )
               );
+
+              // Refresh sessions from backend to get the auto-generated title
+              setTimeout(() => {
+                loadSessions();
+              }, 1000); // Small delay to ensure backend has processed the title
             },
             // On error
             (error) => {
@@ -607,6 +633,24 @@ export const useEnhancedNewsChat = () => {
                 : msg
             )
           );
+
+          // Update session message count and refresh sessions to get auto-generated title
+          setSessions((prev) =>
+            prev.map((s) =>
+              s.id === currentSessionId
+                ? {
+                    ...s,
+                    lastActivity: new Date().toISOString(),
+                    messageCount: (s.messageCount || 0) + 2,
+                  }
+                : s
+            )
+          );
+
+          // Refresh sessions from backend to get the auto-generated title
+          setTimeout(() => {
+            loadSessions();
+          }, 1000); // Small delay to ensure backend has processed the title
         }
       } catch (err) {
         console.error("Error sending message:", err);
@@ -661,6 +705,7 @@ export const useEnhancedNewsChat = () => {
     messages,
     isLoading,
     isStreaming,
+    isLoadingSessions,
     error,
     sendMessage,
     resetSession,

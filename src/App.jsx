@@ -23,6 +23,7 @@ function ChatPage() {
     messages,
     isLoading,
     isStreaming,
+    isLoadingSessions,
     error,
     sendMessage,
     resetSession,
@@ -40,6 +41,9 @@ function ChatPage() {
     } else if (currentSessionId && currentSessionId !== sessionId) {
       // Session changed programmatically, update URL
       navigate(`/chat/${currentSessionId}`, { replace: true });
+    } else if (!currentSessionId && sessionId) {
+      // Current session cleared (e.g., after deletion), navigate to home
+      navigate("/", { replace: true });
     }
   }, [sessionId, currentSessionId, navigate, selectSession]);
 
@@ -75,6 +79,7 @@ function ChatPage() {
         onUpdateSessionTitle={updateSessionTitle}
         isOpen={sidebarOpen}
         onToggle={toggleSidebar}
+        isLoading={isLoadingSessions}
       />
 
       {/* Header */}
@@ -83,7 +88,9 @@ function ChatPage() {
           messageCount={messages.length}
           isConnected={isConnected}
           currentSessionTitle={
-            sessions.find((s) => s.id === currentSessionId)?.title
+            currentSessionId
+              ? sessions.find((s) => s.id === currentSessionId)?.title
+              : null
           }
         />
       </div>

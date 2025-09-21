@@ -9,8 +9,6 @@ export const useSocket = () => {
     // Get backend URL from environment variable
     const backendUrl = import.meta.env.VITE_API_BASE_URL;
 
-    console.log("Connecting to Socket.IO server:", backendUrl);
-
     // Initialize socket connection
     socketRef.current = io(backendUrl, {
       transports: ["websocket", "polling"],
@@ -23,12 +21,10 @@ export const useSocket = () => {
 
     // Connection event handlers
     socketRef.current.on("connect", () => {
-      console.log("Socket.IO connected:", socketRef.current.id);
       setIsConnected(true);
     });
 
     socketRef.current.on("disconnect", (reason) => {
-      console.log("Socket.IO disconnected:", reason);
       setIsConnected(false);
     });
 
